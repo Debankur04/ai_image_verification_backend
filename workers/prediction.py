@@ -1,32 +1,40 @@
-import tensorflow as tf
+import os
 from pathlib import Path
-import keras
+import tensorflow as tf
+from tensorflow import keras
 
-INFERENCE_DIR = Path(__file__).resolve().parent.parent
-MODEL_PATH = INFERENCE_DIR / "models" / "ai_vs_real_cnn.keras"
+# ---------- CONFIG ----------
+MODEL_PATH = Path("models") / "ai_vs_real_cnn.keras"
 
-model = keras.models.load_model(MODEL_PATH)
+# ---------- LAZY MODEL LOAD ----------
+_model = None
 
-# print('model loaded')
-# model.summary()
-# print('done')
+def get_model():
+    global _model
+    if _model is None:
+        if not MODEL_PATH.exists():
+            raise FileNotFoundError(f"Model not found at {MODEL_PATH}")
+        _model = keras.models.load_model(MODEL_PATH)
+    return _model
 
 
+# ---------- HELPERS ----------
 def ensure_valid_batch(images):
     if not (1 <= len(images) <= 2):
         raise ValueError("Batch must contain 1 or 2 images.")
-    
 
-def predict_batch(images, threshold=0.5):
+
+# ---------- PREDICTION ----------
+def predict_batch(images, threshold=0.40):
     """
     images: list of 1 or 2 tensors, each (224, 224, 3)
     """
 
     ensure_valid_batch(images)
 
-    
     batch = tf.stack(images, axis=0)
 
+    model = get_model()
     probs = model.predict(batch)
 
     results = []
@@ -37,11 +45,8 @@ def predict_batch(images, threshold=0.5):
         confidence = p if p >= threshold else 1 - p
 
         results.append({
-            "image_tensor": images[i],
             "prediction": label,
             "confidence": round(confidence * 100, 2)
         })
 
     return results
-
-

@@ -5,8 +5,6 @@ from dotenv import load_dotenv
 load_dotenv()
 resend.api_key = os.getenv("RESEND_API_KEY")
 
-print(resend.api_key)
-
 def send_report_email(user_email: str, user_id: str, report_link: str):
     """
     Sends report download link to the user via Resend.

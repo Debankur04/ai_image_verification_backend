@@ -1,29 +1,35 @@
-fastapi>=0.128.0
-uvicorn>=0.40.0
+# --- API ---
+fastapi>=0.95.0,<0.110.0
+uvicorn>=0.22.0,<0.30.0
 
-tensorflow>=2.20.0
-keras>=3.11.0,<3.13
-
+# --- ML CORE (CRITICAL) ---
+tensorflow==2.12.1
+keras==2.12.0
 scikit-learn==1.4.2
 
+# --- DATA ---
+numpy>=1.23.5,<1.26.0
+pandas>=1.5.0,<2.0.0
+matplotlib>=3.6.0,<3.9.0
+contourpy>=1.1.0,<1.3.0
 
-numpy>=1.26.0
-pandas>=2.3.3
-matplotlib>=3.8.0
-contourpy>=1.2.0
+# --- IMAGING / REPORTS ---
+pillow>=9.5.0,<11.0.0
+reportlab>=4.0.0
 
-pillow>=12.1.0
-reportlab>=4.4.9
+# --- QUEUE / CACHE ---
+redis>=4.5.0,<6.0.0
+rq>=1.15.0,<2.0.0
 
-redis>=7.1.0
-rq>=2.6.1
+# --- SUPABASE ---
+supabase>=2.0.0,<3.0.0
+supabase-auth>=2.0.0,<3.0.0
 
-supabase>=2.27.2
-supabase-auth>=2.27.2
+# --- CONFIG / VALIDATION ---
+pydantic[email]>=1.10.0,<2.0.0
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
 
-pydantic[email]>=2.12.5
-python-dotenv>=1.2.1
-python-multipart>=0.0.21
-
-resend>=2.19.0
-tqdm>=4.67.1
+# --- EMAIL / UTILS ---
+resend>=0.6.0
+tqdm>=4.64.0

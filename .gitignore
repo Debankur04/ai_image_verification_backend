@@ -1,9 +1,131 @@
-<<<<<<< HEAD
-# your .gitignore
-.venv/
+############################
+# PYTHON
+############################
 __pycache__/
-=======
-# GitHub .gitignore
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+############################
+# ENVIRONMENT / SECRETS
+############################
 .env
+.env.*
+*.env
+
+############################
+# FASTAPI / UVICORN
+############################
 *.log
->>>>>>> f98b44d
+logs/
+uvicorn.log
+
+############################
+# MACHINE LEARNING
+############################
+# Model checkpoints / weights
+*.h5
+*.hdf5
+*.keras
+*.ckpt
+*.pt
+*.pth
+
+# TensorFlow / Keras
+*.pb
+*.pbtxt
+saved_model/
+
+# PyTorch
+*.onnx
+
+# Datasets
+data/
+datasets/
+*.csv
+*.tsv
+*.parquet
+*.jsonl
+
+############################
+# JUPYTER / EXPERIMENTS
+############################
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+############################
+# CACHE / TEMP
+############################
+.cache/
+.mypy_cache/
+.pytest_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
+
+############################
+# BUILD / DIST
+############################
+build/
+dist/
+*.egg-info/
+
+############################
+# SUPABASE
+############################
+supabase/.temp/
+supabase/.env
+
+############################
+# FRONTEND (if added later)
+############################
+node_modules/
+.next/
+out/
+dist/
+
+############################
+# DOCKER
+############################
+.dockerignore
+docker-compose.override.yml
+
+############################
+# IDE / EDITOR
+############################
+.vscode/
+.idea/
+*.swp
+*.swo
+
+############################
+# OS
+############################
+.DS_Store
+Thumbs.db
+
+############################
+# TEST OUTPUTS
+############################
+test-results/
+reports/
+
+############################
+# PDF / GENERATED FILES
+############################
+*.pdf
+*.docx
+*.xlsx
+
+############################
+# MISC
+############################
+*.tmp
+*.bak
+*.old

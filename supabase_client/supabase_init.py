@@ -7,9 +7,12 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 ANON_KEY = os.getenv("ANON_KEY")
 SERVICE_ROLE_KEY = os.getenv("SERVICE_ROLE_KEY")
+
 print("URL:", SUPABASE_URL)
 print("ANON:", ANON_KEY)
 print("SERVICE:", SERVICE_ROLE_KEY)
+
+
 # User-level client (RLS enforced)
 supabase_public: Client = create_client(SUPABASE_URL, ANON_KEY)
 
