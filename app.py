@@ -5,6 +5,7 @@ from fastapi import (
     HTTPException,
     Depends,
 )
+import os
 from fastapi.responses import RedirectResponse
 from typing import List
 from datetime import datetime
@@ -39,8 +40,8 @@ app.add_middleware(
 
 # ---------------- Redis ----------------
 redis = Redis(
-    host="localhost",
-    port=6379,
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
     db=0,
     decode_responses=True
 )
