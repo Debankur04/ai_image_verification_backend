@@ -1,23 +1,30 @@
 import os
 from pathlib import Path
-import tensorflow as tf
-from tensorflow import keras
+import numpy as np
+import onnxruntime as ort
 
 # ---------- CONFIG ----------
-MODEL_PATH = Path("models") / "ai_vs_real_cnn_v1.keras"
+MODEL_PATH = Path("models") / "ai_vs_real_cnn_frozen.onnx"
 
-# ---------- EAGER MODEL LOAD (FAIL FAST) ----------
+# ---------- LOAD ONNX MODEL (FAIL FAST) ----------
 if not MODEL_PATH.exists():
     raise FileNotFoundError(f"Model not found at {MODEL_PATH}")
 
-print("🔄 Loading model...")
-MODEL = keras.models.load_model(MODEL_PATH)
+print("🔄 Loading ONNX model...")
+
+SESSION = ort.InferenceSession(
+    str(MODEL_PATH),
+    providers=["CPUExecutionProvider"]
+)
+
+INPUT_NAME = SESSION.get_inputs()[0].name
+OUTPUT_NAME = SESSION.get_outputs()[0].name
 
 # ---------- STARTUP SANITY CHECK ----------
-_dummy = tf.zeros((2, 224, 224, 3))
-MODEL.predict(_dummy)
+_dummy = np.zeros((2, 224, 224, 3), dtype=np.float32)
+SESSION.run([OUTPUT_NAME], {INPUT_NAME: _dummy})
 
-print("✅ Model loaded and verified")
+print("✅ ONNX model loaded and verified")
 
 # ---------- HELPERS ----------
 def ensure_valid_batch(images):
@@ -27,12 +34,16 @@ def ensure_valid_batch(images):
 # ---------- PREDICTION ----------
 def predict_batch(images, threshold=0.40):
     """
-    images: list of 1 or 2 tensors, each (224, 224, 3)
+    images: list of 1 or 2 NumPy arrays, each (224, 224, 3)
     """
     ensure_valid_batch(images)
 
-    batch = tf.stack(images, axis=0)
-    probs = MODEL.predict(batch)
+    batch = np.stack(images, axis=0).astype(np.float32)
+
+    probs = SESSION.run(
+        [OUTPUT_NAME],
+        {INPUT_NAME: batch}
+    )[0]  # shape: (B, 1)
 
     results = []
     for prob in probs:
