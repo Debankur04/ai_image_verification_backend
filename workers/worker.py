@@ -11,7 +11,8 @@ from supabase_client.storage_operations import (
     create_signed_report_url
 )
 from supabase_client.db_operations import update_job_status
-
+import os
+from job_storage.mongo import jobs_collection
 
 # =========================
 # Graceful Shutdown
@@ -25,16 +26,32 @@ signal.signal(signal.SIGINT, shutdown_handler)
 signal.signal(signal.SIGTERM, shutdown_handler)
 
 
+def get_redis():
+    redis_url = os.getenv("REDIS_URL")
+
+    if redis_url:
+        return Redis.from_url(redis_url, decode_responses=True)
+
+    return Redis(
+        host=os.getenv("REDIS_HOST", "redis"),
+        port=int(os.getenv("REDIS_PORT", 6379)),
+        db=0,
+        decode_responses=True
+    )
+
+async def fetch_next_job():
+    job = await jobs_collection.find_one_and_update(
+        {},                         # pick any job
+        {"$inc": {"retry_count": 1}},
+        return_document=True
+    )
+    return job
+
+
 # =========================
 # Worker Function
 # =========================
 def run_worker():
-    r = Redis(
-        host="localhost",
-        port=6379,
-        db=0,
-        decode_responses=True
-    )
 
     QUEUE_NAME = "task_queue"
     PROCESSING_QUEUE = "task_queue:PROGRESSED"
@@ -50,11 +67,7 @@ def run_worker():
     while True:
         try:
             print("⏳ Waiting for next job...")
-            task_json = r.brpoplpush(
-                QUEUE_NAME,
-                PROCESSING_QUEUE,
-                timeout=5
-            )
+            task_json = fetch_next_job()
 
             if not task_json:
                 idle_retries += 1

@@ -5,13 +5,11 @@ from fastapi import (
     HTTPException,
     Depends,
 )
+from job_storage.mongo import jobs_collection
 import os
 from fastapi.responses import RedirectResponse
 from typing import List
 from datetime import datetime
-import json
-
-from redis import Redis
 from fastapi.middleware.cors import CORSMiddleware
 from supabase_client.supabase_init import supabase_public
 from supabase_client.auth import signup, signin, signout
@@ -30,6 +28,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,14 +37,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------- Redis ----------------
-redis = Redis(
-    host=os.getenv("REDIS_HOST", "localhost"),
-    port=int(os.getenv("REDIS_PORT", 6379)),
-    db=0,
-    decode_responses=True
-)
-QUEUE_NAME = "task_queue"
+async def enqueue_job(job_data: dict):
+    await jobs_collection.insert_one(job_data)
+
 
 # ---------------- Constants ----------------
 BUCKET = "user-uploads"
@@ -142,8 +136,8 @@ async def create_job(
         input_prefix=input_prefix
     )
 
-    # ---------------- Push to Redis ----------------
-    redis_payload = {
+    # ---------------- Enqueue Job (MongoDB) ----------------
+    payload = {
         "job_id": job_id,
         "user_id": user["user_id"],
         "user_email": user["email"],
@@ -155,7 +149,7 @@ async def create_job(
         "created_at": datetime.utcnow().isoformat()
     }
 
-    redis.rpush(QUEUE_NAME, json.dumps(redis_payload))
+    await enqueue_job(payload)
 
     return JobCreateResponse(job_id=job_id, status="QUEUED")
 
@@ -220,11 +214,20 @@ def download_report(job_id: str, user=Depends(get_current_user)):
 
 @app.delete("/jobs/{job_id}")
 def delete_job_api(job_id: str, user=Depends(get_current_user)):
+    job = (
+        supabase_public
+        .table("jobs")
+        .select("job_id")
+        .eq("job_id", job_id)
+        .eq("user_id", user["user_id"])
+        .single()
+        .execute()
+    )
+
+    if not job.data:
+        raise HTTPException(status_code=404, detail="Job not found")
+
     delete_job(job_id)
-    return {
-        "job_id": job_id,
-        "status": "deleted"
-    }
 
 @app.post("/internal/run-worker")
 def run_worker_once():
