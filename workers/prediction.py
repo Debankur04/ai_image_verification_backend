@@ -46,7 +46,7 @@ def predict_batch(images, threshold=0.40):
     )[0]  # shape: (B, 1)
 
     results = []
-    for prob in probs:
+    for i, prob in enumerate(probs):
         p = float(prob[0])
 
         label = "AI Generated" if p >= threshold else "Real"
@@ -54,7 +54,7 @@ def predict_batch(images, threshold=0.40):
 
         results.append({
             "prediction": label,
-            "confidence": round(confidence * 100, 2)
+            "confidence": round(confidence * 100, 2),
+            "image_tensor": images[i]
         })
-
     return results

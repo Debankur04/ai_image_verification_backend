@@ -14,7 +14,7 @@ from reportlab.platypus import (
     Table,
     TableStyle
 )
-from reportlab.lib import colors
+
 
 
 def calculate_ai_percentage(results):

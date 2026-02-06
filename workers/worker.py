@@ -2,42 +2,31 @@ import json
 import traceback
 import signal
 import sys
-from redis import Redis
-
 from workers import email_worker, image_prep, pdf_creator, prediction
 from supabase_client.supabase_init import supabase_admin
 from supabase_client.storage_operations import (
     delete_images_create_report,
     create_signed_report_url
 )
+import asyncio
 from supabase_client.db_operations import update_job_status
-import os
-from job_storage.mongo import jobs_collection
+from job_storage.mongo_init import jobs_collection
 
 # =========================
 # Graceful Shutdown
 # =========================
+shutdown_event = asyncio.Event()
 def shutdown_handler(sig=None, frame=None):
-    print("\n🛑 Worker shutdown requested. Exiting gracefully...")
-    sys.exit(0)
+    print("\n🛑 Worker shutdown requested. Stopping worker...")
+    loop = asyncio.get_event_loop()
+    loop.call_soon_threadsafe(shutdown_event.set)
+
 
 
 signal.signal(signal.SIGINT, shutdown_handler)
 signal.signal(signal.SIGTERM, shutdown_handler)
 
 
-def get_redis():
-    redis_url = os.getenv("REDIS_URL")
-
-    if redis_url:
-        return Redis.from_url(redis_url, decode_responses=True)
-
-    return Redis(
-        host=os.getenv("REDIS_HOST", "redis"),
-        port=int(os.getenv("REDIS_PORT", 6379)),
-        db=0,
-        decode_responses=True
-    )
 
 async def fetch_next_job():
     job = await jobs_collection.find_one_and_update(
@@ -47,27 +36,36 @@ async def fetch_next_job():
     )
     return job
 
+async def handle_success(job):
+    await jobs_collection.delete_one({"_id": job["_id"]})
+    # Update SQL → DONE
+
+
+
+MAX_RETRIES = 5
+
+async def handle_failure(job):
+    if job["retry_count"] >= MAX_RETRIES:
+        await jobs_collection.delete_one({"_id": job["_id"]})
+        # Update SQL → FAILED
+
 
 # =========================
 # Worker Function
 # =========================
-def run_worker():
+async def run_worker():
 
-    QUEUE_NAME = "task_queue"
-    PROCESSING_QUEUE = "task_queue:PROGRESSED"
 
     MAX_IDLE_RETRIES = 5
-    MAX_JOB_RETRIES = 5
     idle_retries = 0
 
     print("🚀 Worker started")
-    print(f"📥 Waiting on Redis queue: {QUEUE_NAME}")
     print("🧠 Press Ctrl+C to stop safely\n")
 
-    while True:
+    while not shutdown_event.is_set():
         try:
             print("⏳ Waiting for next job...")
-            task_json = fetch_next_job()
+            task_json = await fetch_next_job()
 
             if not task_json:
                 idle_retries += 1
@@ -75,12 +73,13 @@ def run_worker():
 
                 if idle_retries >= MAX_IDLE_RETRIES:
                     shutdown_handler()
+                    return 
 
                 continue
 
             idle_retries = 0
 
-            task = json.loads(task_json)
+            task = task_json
             job_id = task["job_id"]
 
             print(f"\n🔄 Picked up job: {job_id}")
@@ -145,40 +144,37 @@ def run_worker():
                     report_path=report_path
                 )
 
-                r.delete(f"job_retry:{job_id}")
-
                 email_worker.send_report_email(
                     user_email=task["user_email"],
                     user_id=task["user_id"],
                     report_link=signed_url
                 )
+                await handle_success(task_json)
 
-                r.lrem(PROCESSING_QUEUE, 1, task_json)
+                # r.lrem(PROCESSING_QUEUE, 1, task_json)
                 print(f"✅ Job {job_id} completed")
 
             except Exception:
                 print(f"❌ Job {job_id} failed")
                 print(traceback.format_exc())
+                
 
-                retry_key = f"job_retry:{job_id}"
-                retries = r.incr(retry_key)
-
-                if retries >= MAX_JOB_RETRIES:
+                if task["retry_count"] >= MAX_RETRIES:
                     update_job_status(job_id=job_id, status="FAILED")
-                    r.lrem(PROCESSING_QUEUE, 1, task_json)
-                    r.delete(retry_key)
+                    await handle_failure(task)
                     print(f"⛔ Job {job_id} permanently failed")
-
                 else:
-                    r.lrem(PROCESSING_QUEUE, 1, task_json)
-                    r.rpush(QUEUE_NAME, task_json)
-                    print(f"🔁 Retrying job {job_id} ({retries}/{MAX_JOB_RETRIES})")
-
-                continue
+                    # Retry will happen later
+                    update_job_status(job_id=job_id, status="QUEUED")
+                    print(
+                    f"🔁 Job {job_id} failed, retrying "
+                    f"({task['retry_count']}/{MAX_RETRIES})"
+                    )
 
         except KeyboardInterrupt:
             shutdown_handler()
 
 
 if __name__ == "__main__":
-    run_worker()
+    import asyncio
+    asyncio.run(run_worker())

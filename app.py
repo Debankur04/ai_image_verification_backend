@@ -5,8 +5,8 @@ from fastapi import (
     HTTPException,
     Depends,
 )
-from job_storage.mongo import jobs_collection
-import os
+from job_storage.mongo_init import jobs_collection
+
 from fastapi.responses import RedirectResponse
 from typing import List
 from datetime import datetime
@@ -230,12 +230,12 @@ def delete_job_api(job_id: str, user=Depends(get_current_user)):
     delete_job(job_id)
 
 @app.post("/internal/run-worker")
-def run_worker_once():
+async def run_worker_once():
     """
     Manually triggers the worker once.
     Blocking call. For testing only.
     """
-    run_worker()
+    await run_worker()
 
     return {
         "status": "finished",
