@@ -22,6 +22,11 @@ from supabase_client.db_operations import (
 from schema import AuthPayload, JobCreateResponse
 from auth_dependency import get_current_user
 from workers.worker import run_worker
+import uuid
+
+from scheduler import start_scheduler
+
+
 # ---------------- App ----------------
 app = FastAPI(
     title="AI Image Detection API",
@@ -37,7 +42,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    start_scheduler()
+    
 async def enqueue_job(job_data: dict):
+    # Ensure queue metadata is present so worker can find the job
+    job_data.setdefault("status", "QUEUED")
+    job_data.setdefault("retry_count", 0)
+
     await jobs_collection.insert_one(job_data)
 
 
@@ -137,6 +150,9 @@ async def create_job(
     )
 
     # ---------------- Enqueue Job (MongoDB) ----------------
+    # Use a unique report filename to avoid collisions and overwrite issues
+    report_filename = f"report_{uuid.uuid4().hex}.pdf"
+
     payload = {
         "job_id": job_id,
         "user_id": user["user_id"],
@@ -145,7 +161,7 @@ async def create_job(
         "input_prefix": f"{input_prefix}/",
         "manifest_path": manifest_path,
         "report_prefix": f"{report_prefix}/",
-        "report_filename": "ai_image_report.pdf",
+        "report_filename": report_filename,
         "created_at": datetime.utcnow().isoformat()
     }
 
@@ -230,14 +246,16 @@ def delete_job_api(job_id: str, user=Depends(get_current_user)):
     delete_job(job_id)
 
 @app.post("/internal/run-worker")
-async def run_worker_once():
-    """
-    Manually triggers the worker once.
-    Blocking call. For testing only.
-    """
-    await run_worker()
+async def run_worker_once_api():
+    """Manually triggers the worker once (bounded polling).
 
-    return {
-        "status": "finished",
-        "message": "Worker run completed"
-    }
+    This endpoint runs a short-lived worker loop that polls MongoDB
+    up to `MAX_IDLE_RETRIES` times before returning. Useful for
+    triggering work from API calls without starting the long-running
+    background worker.
+    """
+    from workers.worker import run_worker_once as run_worker_once_fn
+
+    await run_worker_once_fn()
+
+    return {"status": "finished", "message": "Worker run completed"}
