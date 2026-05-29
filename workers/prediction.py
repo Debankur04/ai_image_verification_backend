@@ -4,7 +4,7 @@ import numpy as np
 import onnxruntime as ort
 
 # ---------- CONFIG ----------
-MODEL_PATH = Path("models") / "ai_vs_real_cnn_frozen.onnx"
+MODEL_PATH = Path("models") / "ai_vs_real_cnn_frozen_v1.onnx"
 
 # ---------- LOAD ONNX MODEL (FAIL FAST) ----------
 if not MODEL_PATH.exists():
