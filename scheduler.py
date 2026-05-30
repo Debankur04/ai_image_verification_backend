@@ -1,3 +1,4 @@
+from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from workers.worker import run_worker_once
@@ -22,11 +23,11 @@ def start_scheduler():
 
     scheduler.add_job(
         trigger_worker,
-        trigger="cron",
-        hour=2,
-        minute=0
+        trigger="interval",
+        hours=24,
+        next_run_time=datetime.now()
     )
 
     scheduler.start()
 
-    print("🕒 Daily scheduler started (2:00 AM)")
+    print("🕒 Daily scheduler started; first run now, then every 24 hours")
