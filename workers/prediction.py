@@ -32,7 +32,7 @@ def ensure_valid_batch(images):
         raise ValueError("Batch must contain 1 or 2 images.")
 
 # ---------- PREDICTION ----------
-def predict_batch(images, threshold=0.40):
+def predict_batch(images, threshold=0.50):
     """
     images: list of 1 or 2 NumPy arrays, each (224, 224, 3)
     """
